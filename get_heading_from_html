@@ -1,0 +1,3 @@
+def get_heading_from_html(html: str) -> str:
+	pass
+
