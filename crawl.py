@@ -1,4 +1,5 @@
 from urllib.parse import urlsplit
+import requests
 
 def get_heading_from_html(html: str) -> str:
     from bs4 import BeautifulSoup, Tag
@@ -104,3 +105,66 @@ def extract_page_data(html: str, page_url: str):
         "outgoing_links": outgoing_links,
         "image_urls": image_urls,
     }
+
+def get_html(url):
+    
+    # Set User-Agent header to avoid being blocked
+    headers = {"User-Agent": "BootCrawler/1.0"}
+    
+    # Fetch the webpage
+    response = requests.get(url, headers=headers)
+    
+    # Raise error for HTTP error status codes (400+)
+    if response.status_code >= 400:
+        raise Exception(f"HTTP error: {response.status_code}")
+    
+    # Check content-type is text/html
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" not in content_type:
+        raise Exception(f"Expected HTML content, got: {content_type}")
+    
+    # Return the HTML content
+    return response.text
+
+def crawl_page(base_url, current_url=None, page_data=None):
+    from urllib.parse import urlparse
+    
+    # Initialize on first call
+    if current_url is None:
+        current_url = base_url
+    if page_data is None:
+        page_data = {}
+    
+    # Check if current_url is on the same domain as base_url
+    base_domain = urlparse(base_url).netloc
+    current_domain = urlparse(current_url).netloc
+    
+    if base_domain != current_domain:
+        return page_data
+    
+    # Normalize the current URL
+    normalized_url = normalize_url(current_url)
+    
+    # Check if we've already crawled this page
+    if normalized_url in page_data:
+        return page_data
+    
+    # Get the HTML from the current URL
+    print(f"Crawling: {current_url}")
+    try:
+        html = get_html(current_url)
+    except Exception as e:
+        print(f"Error crawling {current_url}: {e}")
+        return page_data
+    
+    # Extract page data
+    data = extract_page_data(html, current_url)
+    
+    # Add to page_data dictionary
+    page_data[normalized_url] = data
+    
+    # Recursively crawl each outgoing link
+    for link in data["outgoing_links"]:
+        crawl_page(base_url, link, page_data)
+    
+    return page_data
